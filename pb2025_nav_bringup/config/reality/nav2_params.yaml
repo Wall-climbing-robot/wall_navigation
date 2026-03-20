@@ -51,14 +51,14 @@ point_lio:
       lidar_time_inte: 0.1
       satu_acc: 4.0                                     # the saturation value of IMU's acceleration. not related to the units
       satu_gyro: 35.0                                   # the saturation value of IMU's angular velocity. not related to the units
-      acc_norm: 1.0                                     # 1.0 for g as unit, 9.81 for m/s^2 as unit of the IMU's acceleration
+      acc_norm: 9.81                                    # 1.0 for g as unit, 9.81 for m/s^2 as unit of the IMU's acceleration
       lidar_meas_cov: 0.01                              # 0.001
       acc_cov_output: 500.0
       gyr_cov_output: 1000.0
       b_acc_cov: 0.0001
       b_gyr_cov: 0.0001
-      imu_meas_acc_cov: 0.1
-      imu_meas_omg_cov: 0.1
+      imu_meas_acc_cov: 0.5
+      imu_meas_omg_cov: 0.5
       gyr_cov_input: 0.1                                # for IMU as input model
       acc_cov_input: 0.1                                # for IMU as input model
       plane_thr: 0.1                                    # 0.05, the threshold for plane criteria, the smaller, the flatter a plane
@@ -99,7 +99,7 @@ sensor_scan_generation:
     use_sim_time: False
     lidar_frame: "front_mid360"
     base_frame: "base_footprint"
-    robot_base_frame: "gimbal_yaw"
+    robot_base_frame: "base_footprint"
 
 terrain_analysis:
   ros__parameters:
@@ -172,7 +172,7 @@ small_gicp_relocalization:
     map_frame: "map"
     odom_frame: "odom"
     base_frame: "base_footprint"
-    robot_base_frame: "gimbal_yaw"
+    robot_base_frame: "base_footprint"
     lidar_frame: "front_mid360"
     init_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]   # [x, y, z, roll, pitch, yaw]
     # The prior_pcd_file does not need to be specified since it going to be set by defaults in launch.
@@ -273,7 +273,7 @@ bt_navigator:
   ros__parameters:
     use_sim_time: False
     global_frame: map
-    robot_base_frame: gimbal_yaw_fake
+    robot_base_frame: base_footprint
     odom_topic: odometry
     bt_loop_duration: 10
     default_server_timeout: 100
@@ -353,7 +353,7 @@ controller_server:
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
       desired_linear_vel: 0.3
-      lookahead_dist: 0.4
+      lookahead_dist: 0.8
       min_lookahead_dist: 0.3
       max_lookahead_dist: 0.8
       lookahead_time: 1.5
@@ -382,11 +382,11 @@ local_costmap:
       update_frequency: 10.0
       publish_frequency: 5.0
       global_frame: odom
-      robot_base_frame: gimbal_yaw_fake
+      robot_base_frame: base_footprint
       rolling_window: true
       width: 5
       height: 5
-      resolution: 0.05
+      resolution: 0.03
       robot_radius: 0.2
       plugins: ["static_layer", "intensity_voxel_layer", "inflation_layer"]
       intensity_voxel_layer:
@@ -432,7 +432,7 @@ global_costmap:
       update_frequency: 5.0
       publish_frequency: 2.0
       global_frame: map
-      robot_base_frame: gimbal_yaw_fake
+      robot_base_frame: base_footprint
       robot_radius: 0.2
       resolution: 0.05
       track_unknown_space: true
@@ -531,7 +531,7 @@ behavior_server:
       plugin: "nav2_behaviors/AssistedTeleop"
     local_frame: odom
     global_frame: map
-    robot_base_frame: gimbal_yaw_fake
+    robot_base_frame: base_footprint
     transform_tolerance: 0.1
     simulate_ahead_time: 2.0
     max_rotational_vel: 1.0
@@ -559,10 +559,10 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [2.5, 2.5, 3.0]
-    min_velocity: [-2.5, -2.5, -3.0]
-    max_accel: [4.5, 4.5, 5.0]
-    max_decel: [-4.5, -4.5, -5.0]
+    max_velocity: [0.5, 0.5, 1.0]
+    min_velocity: [-0.5, -0.5, -1.0]
+    max_accel: [1.0, 1.0, 2.0]
+    max_decel: [-1.0, -1.0, -2.0]
     odom_topic: "odometry"
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]
