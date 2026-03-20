@@ -103,17 +103,17 @@ sensor_scan_generation:
 
 terrain_analysis:
   ros__parameters:
-    scanVoxelSize: 0.05                 # 点云下采样
-    decayTime: 0.5                      # 点云时间差阈值 大于则不会被处理
+    scanVoxelSize: 0.03                 # 点云下采样
+    decayTime: 1.0                     # 点云时间差阈值 大于则不会被处理
     noDecayDis: 0.0                     # 点云距离阈值 小于该阈值不考虑时间差
     clearingDis: 0.0                    # 该距离外的点会被清除
     useSorting: True                    # 这个参数开起来就能上坡了；如果 use_sorting,那么就以周围点中的分位点作为地面点，否则以最低点作为地面点；周围其余点相对于地面点的高度作为通过代价，所以对于坡面，有的点的代价是正，有的是负，就相互抵消了；不要与 consider_drop 同时开启，计算上会有冲突
-    quantileZ: 0.2                      # useful if use_sorting is enabled.
-    considerDrop: False                 # 考虑凹下去的地面,开启则将相对于地面点的高度取绝对值
-    limitGroundLift: False
+    quantileZ: 0.25                      # useful if use_sorting is enabled.
+    considerDrop: True                # 考虑凹下去的地面,开启则将相对于地面点的高度取绝对值
+    limitGroundLift: True
     maxGroundLift: 0.3
-    clearDyObs: True                    # 清除动态物体的话，有动态物体走过的地方就走不了了
-    minDyObsDis: 0.3                    # 以下参数都是在 clear_dy_obs 的情况下才有用的
+    clearDyObs: False                   # 清除动态物体的话，有动态物体走过的地方就走不了了
+    minDyObsDis: 0.1                    # 以下参数都是在 clear_dy_obs 的情况下才有用的
     minDyObsAngle: 0.0
     minDyObsRelZ: -0.3
     absDyObsRelZThre: 0.2
@@ -123,11 +123,11 @@ terrain_analysis:
     noDataObstacle: False               # treat no data as obstacle
     noDataBlockSkipNum: 0
     minBlockPointNum: 10
-    vehicleHeight: 0.5                  # 小于车辆高度的点才会进行处理
+    vehicleHeight: 0.08                  # 小于车辆高度的点才会进行处理
     voxelPointUpdateThre: 100
     voxelTimeUpdateThre: 1.0
     minRelZ: -1.5                       # min_rel_z 以及 max_rel_z 限制了有效点云点的Z值范围，用于对天花板和地板进行处理
-    maxRelZ: 0.5
+    maxRelZ: 0.3
     disRatioZ: 0.2                      # Z 值的最大最小范围由这两个值决定，但是并不等于这两个值，是有一个比例关系的，距离机器人越远，限定范围就越大，这其中考虑了坡度
 
 terrain_analysis_ext:
@@ -273,7 +273,7 @@ bt_navigator:
   ros__parameters:
     use_sim_time: False
     global_frame: map
-    robot_base_frame: base_footprint
+    robot_base_frame: base_footprint——fake
     odom_topic: odometry
     bt_loop_duration: 10
     default_server_timeout: 100
@@ -348,7 +348,7 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.10
+      xy_goal_tolerance: 0.08
       yaw_goal_tolerance: 6.28
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
@@ -380,14 +380,14 @@ local_costmap:
     ros__parameters:
       use_sim_time: False
       update_frequency: 10.0
-      publish_frequency: 5.0
+      publish_frequency: 0.35
       global_frame: odom
       robot_base_frame: base_footprint
       rolling_window: true
-      width: 5
-      height: 5
+      width: 4
+      height: 4
       resolution: 0.03
-      robot_radius: 0.2
+      robot_radius: 0.35
       plugins: ["static_layer", "intensity_voxel_layer", "inflation_layer"]
       intensity_voxel_layer:
         plugin: pb_nav2_costmap_2d::IntensityVoxelLayer
@@ -412,8 +412,8 @@ local_costmap:
           # It doesn't need to start with '/'
           topic: <robot_namespace>/terrain_map
           sensor_frame: front_mid360
-          min_obstacle_height: 0.0
-          max_obstacle_height: 2.0
+          min_obstacle_height: -0.05
+          max_obstacle_height: 0.5
           obstacle_max_range: 5.0
           obstacle_min_range: 0.2
       static_layer:
@@ -422,7 +422,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0
-        inflation_radius: 0.7
+        inflation_radius: 0.5
       always_send_full_costmap: False
 
 global_costmap:
@@ -433,7 +433,7 @@ global_costmap:
       publish_frequency: 2.0
       global_frame: map
       robot_base_frame: base_footprint
-      robot_radius: 0.2
+      robot_radius: 0.35
       resolution: 0.05
       track_unknown_space: true
       plugins: ["static_layer", "intensity_voxel_layer", "inflation_layer"]
@@ -497,7 +497,7 @@ planner_server:
       plugin: "nav2_theta_star_planner/ThetaStarPlanner" # In Iron and older versions, "/" was used instead of "::"
       how_many_corners: 8
       w_euc_cost: 1.0
-      w_traversal_cost: 10.0
+      w_traversal_cost: 5.0
       w_heuristic_cost: 1.0
 
 smoother_server:
@@ -518,9 +518,9 @@ behavior_server:
     local_footprint_topic: local_costmap/published_footprint
     global_footprint_topic: global_costmap/published_footprint
     cycle_frequency: 10.0
-    behavior_plugins: ["spin", "backup", "drive_on_heading", "assisted_teleop", "wait"]
-    spin:
-      plugin: "nav2_behaviors/Spin"
+    behavior_plugins: ["backup", "drive_on_heading", "assisted_teleop", "wait"]
+    # spin:
+    #   plugin: "nav2_behaviors/Spin"
     backup:
       plugin: "pb_nav2_behaviors/BackUpFreeSpace"
     drive_on_heading:
@@ -539,7 +539,7 @@ behavior_server:
     rotational_acc_lim: 3.2
     # params for pb_nav2_behaviors/BackUpFreeSpace
     service_name: "global_costmap/get_costmap"
-    max_radius: 2.0
+    max_radius: 0.5
     visualize: false
 
 waypoint_follower:
