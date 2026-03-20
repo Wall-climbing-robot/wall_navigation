@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+
+    <!--include defination-->
+    <xmacro_include uri="model://rplidar_a2/model.sdf.xmacro" />
+    <xmacro_include uri="model://mid360/model.sdf.xmacro" />
+    <!--property defination-->
+    <xmacro_define_value name="global_initial_color" value="none" />
+    <xmacro_define_value name="global_armor_sticker_type" value="num3" />
+    <!-- 底盘距离水平地面的高度 -->
+    <xmacro_define_value name="chassis_height" value="0.077" />
+
+    <!--cleaner_robot model-->
+    <model name="cleaner_robot">
+
+        <pose>0 0 0.15 0 0 0</pose>
+        <!--livox-->
+        <!-- 改成（挂在底盘上，例：mid360偏前5cm、高15cm、向前倾30°） -->
+        <xmacro_block name="livox" prefix="front_" parent="base_footprint" pose="0.05 0.0 0.15 0.0 -0.524 0.0" update_rate="20" samples="1875"/>
+
+        <!--plugins-->
+        <!-- https://github.com/gazebosim/gz-sim/blob/ign-gazebo6/src/systems -->
+
+        <!--plugin for joint state sensor-->
+        <plugin filename="ignition-gazebo-joint-state-publisher-system" name="ignition::gazebo::systems::JointStatePublisher">
+        </plugin>
+
+        <!--plugin for light bar-->
+        <plugin filename="LightBarController" name="ignition::gazebo::systems::LightBarController">
+            <controller_name>color</controller_name>
+            <link_visual>armor_0/light_bar_visual</link_visual>
+            <link_visual>armor_1/light_bar_visual</link_visual>
+            <link_visual>armor_2/light_bar_visual</link_visual>
+            <link_visual>armor_3/light_bar_visual</link_visual>
+            <link_visual>light_indicator/light_bar_visual</link_visual>
+            <link_visual>speed_monitor/light_bar_visual</link_visual>
+            <initial_color>${global_initial_color}</initial_color>
+        </plugin>
+
+    </model>
+</sdf>
