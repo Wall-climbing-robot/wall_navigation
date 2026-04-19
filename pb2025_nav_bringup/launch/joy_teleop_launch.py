@@ -19,7 +19,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, GroupAction
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node, PushRosNamespace, SetRemap
+from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterFile
 from nav2_common.launch import RewrittenYaml
 
@@ -41,7 +41,7 @@ def generate_launch_description():
     configured_params = ParameterFile(
         RewrittenYaml(
             source_file=joy_config_file,
-            root_key=namespace,
+            root_key="",
             param_rewrites=param_substitutions,
             convert_types=True,
         ),
@@ -81,9 +81,6 @@ def generate_launch_description():
 
     bringup_cmd_group = GroupAction(
         [
-            PushRosNamespace(namespace=namespace),
-            SetRemap("/tf", "tf"),
-            SetRemap("/tf_static", "tf_static"),
             Node(
                 package="joy",
                 executable="joy_node",
@@ -105,8 +102,6 @@ def generate_launch_description():
                 parameters=[configured_params],
                 remappings=[
                     ("/cmd_vel", joy_vel),
-                    ("/tf", "tf"),
-                    ("/tf_static", "tf_static"),
                 ],
             ),
         ]

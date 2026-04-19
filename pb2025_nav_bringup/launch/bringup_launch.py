@@ -29,7 +29,7 @@ from launch.conditions import (
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
-from launch_ros.actions import Node, PushRosNamespace, SetRemap
+from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterFile
 from nav2_common.launch import ReplaceString, RewrittenYaml
 
@@ -73,7 +73,7 @@ def generate_launch_description():
     configured_params = ParameterFile(
         RewrittenYaml(
             source_file=params_file,
-            root_key=namespace,
+            root_key="",
             param_rewrites=param_substitutions,
             convert_types=True,
         ),
@@ -139,9 +139,6 @@ def generate_launch_description():
     # Specify the actions
     bringup_cmd_group = GroupAction(
         [
-            PushRosNamespace(namespace=namespace),
-            SetRemap("/tf", "tf"),
-            SetRemap("/tf_static", "tf_static"),
             Node(
                 condition=IfCondition(use_composition),
                 name="nav2_container",

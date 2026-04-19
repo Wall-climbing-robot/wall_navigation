@@ -45,7 +45,7 @@ def generate_launch_description():
     configured_params = ParameterFile(
         RewrittenYaml(
             source_file=params_file,
-            root_key=namespace,
+            root_key="",
             param_rewrites=param_substitutions,
             convert_types=True,
         ),
@@ -132,11 +132,6 @@ def generate_launch_description():
         respawn_delay=2.0,
         parameters=[configured_params],
         arguments=["--ros-args", "--log-level", log_level],
-        remappings=[
-            ("/map", "map"),
-            ("/map_metadata", "map_metadata"),
-            ("/map_updates", "map_updates"),
-        ],
     )
 
     start_point_lio_node = Node(

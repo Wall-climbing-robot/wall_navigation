@@ -35,7 +35,7 @@ def generate_launch_description():
     params_file = LaunchConfiguration("params_file")
     use_composition = LaunchConfiguration("use_composition")
     container_name = LaunchConfiguration("container_name")
-    container_name_full = (namespace, "/", container_name)
+    container_name_full = container_name
     use_respawn = LaunchConfiguration("use_respawn")
     log_level = LaunchConfiguration("log_level")
 
@@ -55,7 +55,7 @@ def generate_launch_description():
     configured_params = ParameterFile(
         RewrittenYaml(
             source_file=params_file,
-            root_key=namespace,
+            root_key="",
             param_rewrites=param_substitutions,
             convert_types=True,
         ),
@@ -159,16 +159,16 @@ def generate_launch_description():
                 parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
             ),
-            Node(
-                package="fake_vel_transform",
-                executable="fake_vel_transform_node",
-                name="fake_vel_transform",
-                output="screen",
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                parameters=[configured_params],
-                arguments=["--ros-args", "--log-level", log_level],
-            ),
+            # Node(
+            #     package="fake_vel_transform",
+            #     executable="fake_vel_transform_node",
+            #     name="fake_vel_transform",
+            #     output="screen",
+            #     respawn=use_respawn,
+            #     respawn_delay=2.0,
+            #     parameters=[configured_params],
+            #     arguments=["--ros-args", "--log-level", log_level],
+            # ),
             Node(
                 package="nav2_controller",
                 executable="controller_server",
@@ -244,7 +244,7 @@ def generate_launch_description():
                 arguments=["--ros-args", "--log-level", log_level],
                 remappings=[
                     ("cmd_vel", "cmd_vel_controller"),  # remap input
-                    ("cmd_vel_smoothed", "cmd_vel_nav2_result"),  # remap output
+                    ("cmd_vel_smoothed", "cmd_vel"),  # remap output
                 ],
             ),
             Node(
@@ -278,12 +278,12 @@ def generate_launch_description():
                 name="sensor_scan_generation",
                 parameters=[configured_params],
             ),
-            ComposableNode(
-                package="fake_vel_transform",
-                plugin="fake_vel_transform::FakeVelTransform",
-                name="fake_vel_transform",
-                parameters=[configured_params],
-            ),
+            # ComposableNode(
+            #     package="fake_vel_transform",
+            #     plugin="fake_vel_transform::FakeVelTransform",
+            #     name="fake_vel_transform",
+            #     parameters=[configured_params],
+            # ),
             ComposableNode(
                 package="nav2_controller",
                 plugin="nav2_controller::ControllerServer",
@@ -331,7 +331,7 @@ def generate_launch_description():
                 parameters=[configured_params],
                 remappings=[
                     ("cmd_vel", "cmd_vel_controller"),  # remap input
-                    ("cmd_vel_smoothed", "cmd_vel_nav2_result"),  # remap output
+                    ("cmd_vel_smoothed", "cmd_vel"),  # remap output
                 ],
             ),
             ComposableNode(

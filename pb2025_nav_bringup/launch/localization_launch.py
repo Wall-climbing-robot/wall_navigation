@@ -37,7 +37,7 @@ def generate_launch_description():
     params_file = LaunchConfiguration("params_file")
     use_composition = LaunchConfiguration("use_composition")
     container_name = LaunchConfiguration("container_name")
-    container_name_full = (namespace, "/", container_name)
+    container_name_full = container_name
     use_respawn = LaunchConfiguration("use_respawn")
     log_level = LaunchConfiguration("log_level")
 
@@ -49,7 +49,7 @@ def generate_launch_description():
     configured_params = ParameterFile(
         RewrittenYaml(
             source_file=params_file,
-            root_key=namespace,
+            root_key="",
             param_rewrites=param_substitutions,
             convert_types=True,
         ),

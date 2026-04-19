@@ -51,7 +51,7 @@ point_lio:
       lidar_time_inte: 0.1
       satu_acc: 4.0                                     # the saturation value of IMU's acceleration. not related to the units
       satu_gyro: 35.0                                   # the saturation value of IMU's angular velocity. not related to the units
-      acc_norm: 1.0                                     # 1.0 for g as unit, 9.81 for m/s^2 as unit of the IMU's acceleration
+      acc_norm: 9.81                                     # 1.0 for g as unit, 9.81 for m/s^2 as unit of the IMU's acceleration
       lidar_meas_cov: 0.01                              # 0.001
       acc_cov_output: 500.0
       gyr_cov_output: 1000.0
@@ -64,8 +64,8 @@ point_lio:
       plane_thr: 0.1                                    # 0.05, the threshold for plane criteria, the smaller, the flatter a plane
       match_s: 81.0
       ivox_grid_resolution: 0.5
-      gravity: [0.0, 0.5305473804473877, -0.8383715748786926]            # gravity to be aligned
-      gravity_init: [0.0, 0.5305473804473877, -0.8383715748786926]       # preknown gravity in the first IMU body frame, use when imu_en is False or start from a non-stationary state
+      gravity: [-0.16, -3.65, -8.98]            # gravity to be aligned
+      gravity_init: [-0.16, -3.65, -8.98]       # preknown gravity in the first IMU body frame, use when imu_en is False or start from a non-stationary state
       extrinsic_T: [ -0.011, -0.02329, 0.04412 ]
       extrinsic_R: [ 1.0, 0.0, 0.0,
                      0.0, 1.0, 0.0,
@@ -103,15 +103,16 @@ sensor_scan_generation:
 
 terrain_analysis:
   ros__parameters:
-    scanVoxelSize: 0.03                 # 点云下采样，精度提高
-    decayTime: 1.0                # 原 0.5 → 1.0，静态墙面点云可以保留更久
+    scanVoxelSize: 0.05                 # 点云下采样
+    decayTime: 0.5                      # 点云时间差阈值 大于则不会被处理
     noDecayDis: 0.0                     # 点云距离阈值 小于该阈值不考虑时间差
     clearingDis: 0.0                    # 该距离外的点会被清除
-    useSorting: True              # 保持，用于找墙面基准平面
-    quantileZ: 0.25               # 原 0.2 → 0.25，墙面特征比地面更均匀
-    considerDrop: True            # 原 False → True！墙边缘会出现"掉落"，必须检测
-    maxGroundLift: 0.1            # 原 0.3 → 0.1，墙面高度变化很小
-    clearDyObs: False                    # 清除动态物体的话，有动态物体走过的地方就走不了了
+    useSorting: True                    # 这个参数开起来就能上坡了；如果 use_sorting,那么就以周围点中的分位点作为地面点，否则以最低点作为地面点；周围其余点相对于地面点的高度作为通过代价，所以对于坡面，有的点的代价是正，有的是负，就相互抵消了；不要与 consider_drop 同时开启，计算上会有冲突
+    quantileZ: 0.2                      # useful if use_sorting is enabled.
+    considerDrop: False                 # 考虑凹下去的地面,开启则将相对于地面点的高度取绝对值
+    limitGroundLift: False
+    maxGroundLift: 0.3
+    clearDyObs: True                    # 清除动态物体的话，有动态物体走过的地方就走不了了
     minDyObsDis: 0.3                    # 以下参数都是在 clear_dy_obs 的情况下才有用的
     minDyObsAngle: 0.0
     minDyObsRelZ: -0.3
@@ -122,12 +123,12 @@ terrain_analysis:
     noDataObstacle: False               # treat no data as obstacle
     noDataBlockSkipNum: 0
     minBlockPointNum: 10
-    vehicleHeight: 0.08           # 原 0.5，只处理突出墙面8cm以内的点（机器人贴墙间隙）
+    vehicleHeight: 0.5                  # 小于车辆高度的点才会进行处理
     voxelPointUpdateThre: 100
     voxelTimeUpdateThre: 1.0
-    minRelZ: -0.05                # 原 -1.5，墙面凹进去超过5cm就忽略（如窗玻璃内凹）
-    maxRelZ: 0.3                  # 原 0.5 → 0.3，关注突出0-30cm的部分
-    disRatioZ: 0.1                # 原 0.2 → 0.1，墙面远近高度变化小
+    minRelZ: -1.5                       # min_rel_z 以及 max_rel_z 限制了有效点云点的Z值范围，用于对天花板和地板进行处理
+    maxRelZ: 0.5
+    disRatioZ: 0.2                      # Z 值的最大最小范围由这两个值决定，但是并不等于这两个值，是有一个比例关系的，距离机器人越远，限定范围就越大，这其中考虑了坡度
 
 terrain_analysis_ext:
   ros__parameters:
@@ -158,7 +159,8 @@ fake_vel_transform:
     input_cmd_vel_topic: "cmd_vel_nav2_result"
     output_cmd_vel_topic: "cmd_vel"
     cmd_spin_topic: "cmd_spin"
-    init_spin_speed: 0.0
+    local_plan_topic: "local_plan"
+    init_spin_speed: 0.0001  # 必须非零！=0时所有Nav2速度被封锁（见源码）
 
 small_gicp_relocalization:
   ros__parameters:
@@ -334,7 +336,7 @@ controller_server:
     odom_topic: odometry
     controller_frequency: 20.0
     min_x_velocity_threshold: 0.001
-    min_y_velocity_threshold: 0.5
+    min_y_velocity_threshold: 0.5      # 保持0.5，差速底盘y速度=0 < 0.5，Nav2识别为差速
     min_theta_velocity_threshold: 0.001
     failure_tolerance: 0.3
     progress_checker_plugins: ["progress_checker"]
@@ -347,14 +349,14 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.10
+      xy_goal_tolerance: 0.10           # 原0.15 → 0.10，精度提高
       yaw_goal_tolerance: 6.28
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.3
+      desired_linear_vel: 0.3           # 地面最大速度 m/s（上墙改0.15）
       lookahead_dist: 0.4
       min_lookahead_dist: 0.3
-      max_lookahead_dist: 0.8
+      max_lookahead_dist: 0.9
       lookahead_time: 1.5
       rotate_to_heading_angular_vel: 0.5
       use_velocity_scaled_lookahead_dist: false
@@ -381,12 +383,12 @@ local_costmap:
       update_frequency: 10.0
       publish_frequency: 5.0
       global_frame: odom
-      robot_base_frame: gimbal_yaw_fake
+      robot_base_frame: base_footprint_fake
       rolling_window: true
       width: 5
       height: 5
-      resolution: 0.03
-      robot_radius: 0.2
+      resolution: 0.05
+      robot_radius: 0.19
       plugins: ["static_layer", "intensity_voxel_layer", "inflation_layer"]
       intensity_voxel_layer:
         plugin: pb_nav2_costmap_2d::IntensityVoxelLayer
@@ -421,7 +423,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0
-        inflation_radius: 0.7
+        inflation_radius: 0.34
       always_send_full_costmap: False
 
 global_costmap:
@@ -431,8 +433,8 @@ global_costmap:
       update_frequency: 5.0
       publish_frequency: 2.0
       global_frame: map
-      robot_base_frame: base_footprint
-      robot_radius: 0.2
+      robot_base_frame: base_footprint_fake
+      robot_radius: 0.19
       resolution: 0.05
       track_unknown_space: true
       plugins: ["static_layer", "intensity_voxel_layer", "inflation_layer"]
@@ -448,10 +450,10 @@ global_costmap:
         unknown_threshold: 5
         z_resolution: 0.05
         z_voxels: 16
-        min_obstacle_height: -0.05
-        max_obstacle_height: 0.5
-        min_obstacle_intensity: 0.05
-        max_obstacle_intensity: 0.5
+        min_obstacle_height: 0.0
+        max_obstacle_height: 2.0
+        min_obstacle_intensity: 0.1
+        max_obstacle_intensity: 2.0
         observation_sources: terrain_map_ext
         terrain_map_ext:
           data_type: PointCloud2
@@ -459,8 +461,8 @@ global_costmap:
           # It doesn't need to start with '/'
           topic: <robot_namespace>/terrain_map_ext
           sensor_frame: front_mid360
-          min_obstacle_height: -0.05
-          max_obstacle_height: 0.5
+          min_obstacle_height: 0.0
+          max_obstacle_height: 2.0
           obstacle_max_range: 10.0
           obstacle_min_range: 0.2
       static_layer:
@@ -469,7 +471,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0
-        inflation_radius: 0.7
+        inflation_radius: 0.34
       always_send_full_costmap: False
 
 # The yaml_filename does not need to be specified since it going to be set by defaults in launch.
@@ -517,7 +519,9 @@ behavior_server:
     local_footprint_topic: local_costmap/published_footprint
     global_footprint_topic: global_costmap/published_footprint
     cycle_frequency: 10.0
-    behavior_plugins: ["backup", "drive_on_heading", "assisted_teleop", "wait"]
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "assisted_teleop", "wait"]
+    spin:
+      plugin: "nav2_behaviors/Spin"
     backup:
       plugin: "pb_nav2_behaviors/BackUpFreeSpace"
     drive_on_heading:
@@ -528,7 +532,7 @@ behavior_server:
       plugin: "nav2_behaviors/AssistedTeleop"
     local_frame: odom
     global_frame: map
-    robot_base_frame: base_footprint
+    robot_base_frame: base_footprint_fake
     transform_tolerance: 0.1
     simulate_ahead_time: 2.0
     max_rotational_vel: 1.0
@@ -536,8 +540,7 @@ behavior_server:
     rotational_acc_lim: 3.2
     # params for pb_nav2_behaviors/BackUpFreeSpace
     service_name: "global_costmap/get_costmap"
-    max_radius: 0.5               # 原 2.0，爬壁时搜索半径要小
-    robot_radius: 0.35            # 与机器人实际尺寸一致
+    max_radius: 2.0
     visualize: false
 
 waypoint_follower:
@@ -557,10 +560,10 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [0.5, 0.5, 1.0]
-    min_velocity: [-0.5, -0.5, -1.0]
-    max_accel: [1.0, 1.0, 2.0]
-    max_decel: [-1.0, -1.0, -2.0]
+    max_velocity: [2.5, 2.5, 3.0]
+    min_velocity: [-2.5, -2.5, -3.0]
+    max_accel: [4.5, 4.5, 5.0]
+    max_decel: [-4.5, -4.5, -5.0]
     odom_topic: "odometry"
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]
@@ -569,7 +572,7 @@ velocity_smoother:
 pb_teleop_twist_joy_node:
   ros__parameters:
     use_sim_time: False
-    robot_base_frame: gimbal_yaw
+    robot_base_frame: base_footprint
     control_mode: auto_control    # Option: auto_control, manual_control
 
     require_enable_button: true

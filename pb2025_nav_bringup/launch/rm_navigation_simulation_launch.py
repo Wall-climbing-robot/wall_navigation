@@ -48,7 +48,7 @@ def generate_launch_description():
     configured_params = ParameterFile(
         RewrittenYaml(
             source_file=params_file,
-            root_key=namespace,
+            root_key="",
             param_rewrites={},
             convert_types=True,
         ),
@@ -58,7 +58,7 @@ def generate_launch_description():
     # Declare the launch arguments
     declare_namespace_cmd = DeclareLaunchArgument(
         "namespace",
-        default_value="red_standard_robot1",
+        default_value="",
         description="Top-level namespace",
     )
 
@@ -141,7 +141,6 @@ def generate_launch_description():
         executable="ign_sim_pointcloud_tool_node",
         name="ign_sim_pointcloud_tool",
         output="screen",
-        namespace=namespace,
         parameters=[configured_params],
     )
 

@@ -138,7 +138,7 @@ def generate_launch_description():
     configured_params = ParameterFile(
         RewrittenYaml(
             source_file=params_file,
-            root_key=namespace,
+            root_key="",
             param_rewrites={},
             convert_types=True,
         ),
@@ -162,7 +162,6 @@ def generate_launch_description():
         executable="livox_ros_driver2_node",
         name="livox_ros_driver2",
         output="screen",
-        namespace=namespace,
         parameters=[configured_params],
     )
 

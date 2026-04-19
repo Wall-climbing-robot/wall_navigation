@@ -1,41 +1,57 @@
 <?xml version="1.0"?>
 <sdf version="1.7">
 
-    <!--include defination-->
-    <xmacro_include uri="model://rplidar_a2/model.sdf.xmacro" />
     <xmacro_include uri="model://mid360/model.sdf.xmacro" />
-    <!--property defination-->
-    <xmacro_define_value name="global_initial_color" value="none" />
-    <xmacro_define_value name="global_armor_sticker_type" value="num3" />
-    <!-- 底盘距离水平地面的高度 -->
-    <xmacro_define_value name="chassis_height" value="0.077" />
 
-    <!--cleaner_robot model-->
+    <!-- 底盘离地高度（卷尺量底盘底板到地面距离，单位米） -->
+    <xmacro_define_value name="chassis_height" value="0.03" />
+
     <model name="cleaner_robot">
 
-        <pose>0 0 0.15 0 0 0</pose>
-        <!--livox-->
-        <!-- 改成（挂在底盘上，例：mid360偏前5cm、高15cm、向前倾30°） -->
-        <xmacro_block name="livox" prefix="front_" parent="base_footprint" pose="0.05 0.0 0.15 0.0 -0.524 0.0" update_rate="20" samples="1875"/>
+        <pose>0 0 0.15 -0.262 0 0</pose>
 
-        <!--plugins-->
-        <!-- https://github.com/gazebosim/gz-sim/blob/ign-gazebo6/src/systems -->
+        <!-- base_footprint：地面投影点，Nav2 的根帧 -->
+        <link name="base_footprint"/>
 
-        <!--plugin for joint state sensor-->
-        <plugin filename="ignition-gazebo-joint-state-publisher-system" name="ignition::gazebo::systems::JointStatePublisher">
-        </plugin>
+        <!-- chassis：底盘本体，在 base_footprint 上方 chassis_height 处 -->
+        <link name="chassis"/>
+        <joint name="base_footprint_joint" type="fixed">
+            <parent>base_footprint</parent>
+            <child>chassis</child>
+            <pose>0 0 ${chassis_height} 0 0 0</pose>
+        </joint>
 
-        <!--plugin for light bar-->
-        <plugin filename="LightBarController" name="ignition::gazebo::systems::LightBarController">
-            <controller_name>color</controller_name>
-            <link_visual>armor_0/light_bar_visual</link_visual>
-            <link_visual>armor_1/light_bar_visual</link_visual>
-            <link_visual>armor_2/light_bar_visual</link_visual>
-            <link_visual>armor_3/light_bar_visual</link_visual>
-            <link_visual>light_indicator/light_bar_visual</link_visual>
-            <link_visual>speed_monitor/light_bar_visual</link_visual>
-            <initial_color>${global_initial_color}</initial_color>
-        </plugin>
+        <!--
+            gimbal_yaw：虚拟帧，位置与 chassis 完全重合（零偏移）
+            为什么要保留：fake_vel_transform 节点以 gimbal_yaw 为父帧，
+            动态发布 gimbal_yaw → gimbal_yaw_fake 的 TF（带旋转）。
+            不要在这里定义 gimbal_yaw_fake，否则会和 fake_vel_transform 冲突！
+        -->
+        <link name="gimbal_yaw"/>
+        <joint name="gimbal_yaw_joint" type="fixed">
+            <parent>chassis</parent>
+            <child>gimbal_yaw</child>
+            <pose>0 0 0 0 0 0</pose>
+        </joint>
+
+        <!--
+            mid360 雷达安装位置，6 个数字含义：
+            前后(m)  左右(m)  高度(m)  roll  pitch  yaw
+            pitch 向前低头为负，例如 30°= -0.524，45°= -0.785
+
+            用卷尺量好后替换下面的数字：
+              第1个数：雷达中心距底盘前后中心的距离（向前为正）
+              第2个数：雷达中心距底盘左右中心的距离（向左为正，居中填0）
+              第3个数：雷达中心距底盘底面的高度
+              第5个数：pitch 角，斜装向前低头填负数
+        -->
+        <xmacro_block
+            name="livox"
+            prefix="front_"
+            parent="chassis"
+            pose="0.10 -0.045 0.20 0.0 -0.332 0.0"
+            update_rate="10"
+            samples="1875"/>
 
     </model>
 </sdf>
