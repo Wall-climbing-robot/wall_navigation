@@ -6,6 +6,205 @@
 
 深圳北理莫斯科大学 北极熊战队 2025 赛季哨兵导航仿真/实车包
 
+---
+
+## `without_serial` 分支 —— 实车运行指南（无串口版）
+
+> **本分支适用于：没有底盘串口通信（`standard_robot_pp_ros2`）的情况下，在实体机器人上独立调试导航模块。**
+>
+> 与 main 分支的核心区别：引入了 `fake_vel_transform` 节点，通过对速度指令积分来虚拟推算 `base_footprint` 坐标系的位姿，从而维持完整 TF 树，无需串口模块即可运行。
+
+### 效果预览
+
+<!-- 请将你的实车建图/导航截图拖拽到此处（在 GitHub 网页上编辑时直接粘贴图片即可自动上传） -->
+<!-- 示例：![建图效果](https://user-images.githubusercontent.com/your-image.png) -->
+
+*（图片待补充：实车建图效果、导航效果、TF树截图等）*
+
+---
+
+### W-1. 环境要求
+
+| 项目 | 要求 |
+|------|------|
+| 操作系统 | Ubuntu 22.04 |
+| ROS | [Humble](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html) |
+| 激光雷达 | Livox Mid-360 |
+| 依赖库 | `small_icp`、`livox_ros_driver2`（已内置于本分支，无需额外克隆） |
+
+安装 `small_icp`（重定位算法依赖）：
+
+```bash
+sudo apt install -y libeigen3-dev libomp-dev
+
+git clone https://github.com/koide3/small_gicp.git
+cd small_gicp
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)
+sudo make install
+```
+
+---
+
+### W-2. 克隆并编译
+
+#### W-2.1 克隆仓库（本分支已内置所有依赖，直接克隆即可，无需 `--recursive`）
+
+```bash
+mkdir -p ~/ros_ws/src
+cd ~/ros_ws/src
+
+git clone -b without_serial https://github.com/Wall-climbing-robot/wall_navigation.git
+```
+
+#### W-2.2 安装 ROS 依赖
+
+```bash
+cd ~/ros_ws
+
+# rosdep 自动安装所有 ROS 包依赖
+rosdep install -r --from-paths src --ignore-src --rosdistro $ROS_DISTRO -y
+```
+
+> **`-r`**：遇到单个包安装失败时继续执行，不中断整个过程。
+> **`--from-paths src`**：从 `src/` 目录下所有 `package.xml` 文件中读取依赖关系。
+> **`--ignore-src`**：如果某个依赖已经在 `src/` 中以源码形式存在，就跳过它（不重复安装 apt 包）。
+
+#### W-2.3 编译
+
+```bash
+cd ~/ros_ws
+
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+```
+
+> **`--symlink-install`**：对 Python/YAML/launch 等非编译文件使用符号链接，修改参数后直接重启即可生效，无需重新编译。
+> **`-DCMAKE_BUILD_TYPE=Release`**：开启编译优化，点云处理等计算密集型模块速度更快。
+
+编译完成后，激活工作空间环境变量：
+
+```bash
+source ~/ros_ws/install/setup.bash
+
+# 建议写入 ~/.bashrc，避免每次打开终端都要手动 source
+echo "source ~/ros_ws/install/setup.bash" >> ~/.bashrc
+```
+
+---
+
+### W-3. 运行流程
+
+#### W-3.1 第一步：建图（采集环境点云地图）
+
+**新开一个终端**，启动建图模式：
+
+```bash
+ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
+  slam:=True \
+  use_robot_state_pub:=True
+```
+
+> **`slam:=True`**：启用 SLAM 建图模式。此时会禁用重定位模块（`small_gicp`），并发送静态 `map→odom` TF 变换。Point-LIO 实时输出里程计，建图过程中会自动将点云保存到 `point_lio/PCD/` 目录下。
+>
+> **`use_robot_state_pub:=True`**：使用本仓库内置的 `robot_state_publisher` 发布机器人 TF（关节位姿），替代原本需要串口模块提供的数据。本分支中 `fake_vel_transform` 节点会进一步补全 `chassis → base_footprint` 的动态变换。
+
+**手动推动/遥控机器人**在目标场地行驶一圈，直到点云地图覆盖完整。
+
+**保存栅格地图**（新开终端执行）：
+
+```bash
+ros2 run nav2_map_server map_saver_cli -f <地图名称> \
+  --ros-args -r __ns:=/red_standard_robot1
+```
+
+将 `<地图名称>` 替换为你想保存的文件名，例如 `rmuc_2025_field`。
+保存后会生成 `<地图名称>.pgm`（栅格图像）和 `<地图名称>.yaml`（元数据）两个文件。
+
+> **建议**：将生成的地图文件放到 `pb2025_nav_bringup/map/reality/` 目录下，与其他地图文件放在一起，方便后续启动时按名称引用。
+
+Point-LIO 建图过程中自动保存的 `.pcd` 先验点云文件（用于重定位）位于：
+
+```
+src/wall_navigation/point_lio/PCD/scans.pcd
+```
+
+将其重命名并移动到 `pb2025_nav_bringup/pcd/reality/<地图名称>.pcd`。
+
+---
+
+#### W-3.2 第二步：自主导航
+
+**新开终端**，启动导航模式（将 `<地图名称>` 替换为你在建图时保存的名称）：
+
+```bash
+ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
+  world:=<地图名称> \
+  slam:=False \
+  use_robot_state_pub:=True
+```
+
+> **`slam:=False`**：导航模式，启用 `small_gicp` 重定位，使用先验点云与当前激光雷达扫描做匹配，输出精确的全局定位。
+>
+> **`world:=<地图名称>`**：告知程序去 `pb2025_nav_bringup/map/reality/` 和 `pb2025_nav_bringup/pcd/reality/` 下加载对应名称的栅格地图和先验点云。
+
+启动后，在 **RViz** 界面中：
+1. 使用 **`2D Pose Estimate`** 给机器人设置一个大致的初始位姿（点击地图上机器人所在位置并拖动方向箭头）。
+2. 使用 **`Nav2 Goal`** 插件点击目标点，机器人即开始规划路径并自主导航。
+
+<!-- 请在此处插入导航效果截图 -->
+<!-- ![导航效果](https://user-images.githubusercontent.com/your-nav-screenshot.png) -->
+
+---
+
+### W-4. `fake_vel_transform` 节点说明
+
+本分支的核心改动之一。
+
+**问题背景**：正式系统中，底盘的 `chassis → base_footprint` TF 变换由串口模块（`standard_robot_pp_ros2`）根据底盘编码器数据实时发布。当没有串口通信时，这个变换缺失，导致整个 TF 树断裂，所有依赖 TF 的模块（导航、点云变换等）都无法工作。
+
+**解决方案**：`fake_vel_transform` 节点订阅导航发出的速度指令话题（`/red_standard_robot1/cmd_vel`），通过对速度进行**时间积分**来估算底盘位姿，并发布 `chassis → base_footprint_fake` 的 TF 变换，从而在没有真实编码器反馈的情况下维持完整的 TF 树。
+
+> **注意**：这种方式存在累计误差（开环积分无法修正），仅适用于调试导航模块，不适合精度要求高的场景。
+
+---
+
+### W-5. 查看 TF 树
+
+如需查看当前完整的 TF 坐标树（各坐标系之间的变换关系），执行：
+
+```bash
+ros2 run rqt_tf_tree rqt_tf_tree \
+  --ros-args \
+  -r /tf:=tf \
+  -r /tf_static:=tf_static \
+  -r __ns:=/red_standard_robot1
+```
+
+> **`-r /tf:=tf`**：将带 namespace 的 `/red_standard_robot1/tf` 话题重映射到 `rqt_tf_tree` 默认监听的 `/tf`，使 TF 树可视化工具能正确接收消息。
+>
+> **`-r __ns:=/red_standard_robot1`**：设置该节点在 `/red_standard_robot1` 命名空间下运行，与导航系统的 namespace 保持一致。
+
+<!-- 请在此处插入 TF 树截图 -->
+<!-- ![TF树](https://user-images.githubusercontent.com/your-tf-tree-screenshot.png) -->
+
+---
+
+### W-6. 常见问题
+
+| 问题 | 排查方向 |
+|------|---------|
+| TF 树不完整，`chassis → base_footprint` 缺失 | 检查 `fake_vel_transform` 节点是否正常启动：`ros2 node list \| grep fake_vel` |
+| Livox Mid-360 无数据 | 检查网卡 IP 配置（默认 `192.168.1.50`），确认 `livox_ros_driver2` 正常运行：`ros2 topic hz /livox/lidar` |
+| `small_gicp` 重定位失败/飘移 | 先用 `2D Pose Estimate` 手动给一个接近真实位置的初始位姿，再等待重定位收敛 |
+| 编译时找不到 `small_icp` | 确认已按 W-1 中的步骤安装 `small_gicp` 并执行了 `sudo make install` |
+| `colcon build` 报内存不足 | 添加 `--parallel-workers 2` 限制并行编译数量，或增加 swap 空间 |
+
+---
+
+> 以下为原仓库文档
+
+---
+
 ![PolarBear Logo](https://raw.githubusercontent.com/SMBU-PolarBear-Robotics-Team/.github/main/.docs/image/polarbear_logo_text.png)
 
 [BiliBili: 谁说在家不能调车！？更适合新手宝宝的 RM 导航仿真](https://www.bilibili.com/video/BV12qcXeHETR)
