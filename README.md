@@ -1,39 +1,11 @@
-# pb2025_sentry_nav
-
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Build and Test](https://github.com/SMBU-PolarBear-Robotics-Team/pb2025_sentry_nav/actions/workflows/build_and_test.yml/badge.svg)](https://github.com/SMBU-PolarBear-Robotics-Team/pb2025_sentry_nav/actions/workflows/build_and_test.yml)
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
-
-深圳北理莫斯科大学 北极熊战队 2025 赛季哨兵导航仿真/实车包
-
----
-
-## `without_serial` 分支 —— 实车运行指南（无串口版）
-
-> **本分支适用于：没有底盘串口通信（`standard_robot_pp_ros2`）的情况下，在实体机器人上独立调试导航模块。**
->
-> 与 main 分支的核心区别：引入了 `fake_vel_transform` 节点，通过对速度指令积分来虚拟推算 `base_footprint` 坐标系的位姿，从而维持完整 TF 树，无需串口模块即可运行。
-
-### 效果预览
-
-<!-- 请将你的实车建图/导航截图拖拽到此处（在 GitHub 网页上编辑时直接粘贴图片即可自动上传） -->
-<!-- 示例：![建图效果](https://user-images.githubusercontent.com/your-image.png) -->
-
-*（图片待补充：实车建图效果、导航效果、TF树截图等）*
-
----
+## `without_serial` 分支
 
 ### W-1. 环境要求
 
-| 项目 | 要求 |
-|------|------|
-| 操作系统 | Ubuntu 22.04 |
-| ROS | [Humble](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html) |
-| 激光雷达 | Livox Mid-360 |
-| 依赖库 | `small_icp`、`livox_ros_driver2`（已内置于本分支，无需额外克隆） |
+#### W-1.1 雷达ip设置
+<img width="1891" height="1256" alt="ip" src="https://github.com/user-attachments/assets/7bd0070a-3e47-43a2-a670-3775526b556c" />
 
-安装 `small_icp`（重定位算法依赖）：
-
+#### W-1.2 安装 `small_icp`（重定位算法依赖）：
 ```bash
 sudo apt install -y libeigen3-dev libomp-dev
 
@@ -44,11 +16,9 @@ cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)
 sudo make install
 ```
 
----
-
 ### W-2. 克隆并编译
 
-#### W-2.1 克隆仓库（本分支已内置所有依赖，直接克隆即可，无需 `--recursive`）
+#### W-2.1 克隆仓库
 
 ```bash
 mkdir -p ~/ros_ws/src
@@ -92,9 +62,11 @@ echo "source ~/ros_ws/install/setup.bash" >> ~/.bashrc
 
 ---
 
-### W-3. 运行流程
 
-#### W-3.1 第一步：建图（采集环境点云地图）
+
+### W-3. 运行
+
+#### W-3.1 第一步：建图
 
 **新开一个终端**，启动建图模式：
 
@@ -110,18 +82,21 @@ ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
 
 **手动推动/遥控机器人**在目标场地行驶一圈，直到点云地图覆盖完整。
 
-**保存栅格地图**（新开终端执行）：
+**再开一个串口终端**，（待补充）：
+
+
+**保存栅格地图**（新开终端执行），建图节点不要按*ctrl+c*：
 
 ```bash
-ros2 run nav2_map_server map_saver_cli -f <地图名称> \
-  --ros-args -r __ns:=/red_standard_robot1
+ros2 run nav2_map_server map_saver_cli -f <地图名称> 
 ```
 
-将 `<地图名称>` 替换为你想保存的文件名，例如 `rmuc_2025_field`。
+将 `<地图名称>` 替换为你想保存的文件名，例如 `rmul2026`。
 保存后会生成 `<地图名称>.pgm`（栅格图像）和 `<地图名称>.yaml`（元数据）两个文件。
 
 > **建议**：将生成的地图文件放到 `pb2025_nav_bringup/map/reality/` 目录下，与其他地图文件放在一起，方便后续启动时按名称引用。
 
+**建图节点按*ctrl+c**：
 Point-LIO 建图过程中自动保存的 `.pcd` 先验点云文件（用于重定位）位于：
 
 ```
@@ -131,6 +106,9 @@ src/wall_navigation/point_lio/PCD/scans.pcd
 将其重命名并移动到 `pb2025_nav_bringup/pcd/reality/<地图名称>.pcd`。
 
 ---
+
+<img width="1142" height="790" alt="mapok" src="https://github.com/user-attachments/assets/73f421e0-00d8-4455-b509-cc543f7b172e" />
+
 
 #### W-3.2 第二步：自主导航
 
@@ -151,10 +129,12 @@ ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
 1. 使用 **`2D Pose Estimate`** 给机器人设置一个大致的初始位姿（点击地图上机器人所在位置并拖动方向箭头）。
 2. 使用 **`Nav2 Goal`** 插件点击目标点，机器人即开始规划路径并自主导航。
 
-<!-- 请在此处插入导航效果截图 -->
-<!-- ![导航效果](https://user-images.githubusercontent.com/your-nav-screenshot.png) -->
+<!-- 没有串口版本 -->
+<img width="1878" height="1514" alt="yun" src="https://github.com/user-attachments/assets/676d96dd-3a37-4112-a372-eb1beb5efa3f" />
 
----
+
+
+
 
 ### W-4. `fake_vel_transform` 节点说明
 
@@ -164,7 +144,7 @@ ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
 
 **解决方案**：`fake_vel_transform` 节点订阅导航发出的速度指令话题（`/red_standard_robot1/cmd_vel`），通过对速度进行**时间积分**来估算底盘位姿，并发布 `chassis → base_footprint_fake` 的 TF 变换，从而在没有真实编码器反馈的情况下维持完整的 TF 树。
 
-> **注意**：这种方式存在累计误差（开环积分无法修正），仅适用于调试导航模块，不适合精度要求高的场景。
+> **注意**：这种方式存在累计误差（开环积分无法修正），仅适用于调试导航模块，不适合精度要求高的场景。 与 main 分支的核心区别：引入了 `fake_vel_transform` 节点，通过对速度指令积分来虚拟推算 `base_footprint` 坐标系的位姿，从而维持完整 TF 树，无需串口模块即可运行。
 
 ---
 
@@ -176,18 +156,18 @@ ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
 ros2 run rqt_tf_tree rqt_tf_tree \
   --ros-args \
   -r /tf:=tf \
-  -r /tf_static:=tf_static \
-  -r __ns:=/red_standard_robot1
+  -r /tf_static:=tf_static 
 ```
 
 > **`-r /tf:=tf`**：将带 namespace 的 `/red_standard_robot1/tf` 话题重映射到 `rqt_tf_tree` 默认监听的 `/tf`，使 TF 树可视化工具能正确接收消息。
->
-> **`-r __ns:=/red_standard_robot1`**：设置该节点在 `/red_standard_robot1` 命名空间下运行，与导航系统的 namespace 保持一致。
+<img width="881" height="641" alt="oktf" src="https://github.com/user-attachments/assets/10ac7a68-6fd3-4c92-b260-6cd8fddccac1" />
 
-<!-- 请在此处插入 TF 树截图 -->
-<!-- ![TF树](https://user-images.githubusercontent.com/your-tf-tree-screenshot.png) -->
+
+
+
 
 ---
+<img width="1242" height="942" alt="tf" src="https://github.com/user-attachments/assets/695ee500-7de7-4490-b9ab-607891f8cf7e" />
 
 ### W-6. 常见问题
 
@@ -200,6 +180,9 @@ ros2 run rqt_tf_tree rqt_tf_tree \
 | `colcon build` 报内存不足 | 添加 `--parallel-workers 2` 限制并行编译数量，或增加 swap 空间 |
 
 ---
+
+
+
 
 > 以下为原仓库文档
 
