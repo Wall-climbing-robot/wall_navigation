@@ -133,7 +133,39 @@ ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
 <img width="1878" height="1514" alt="yun" src="https://github.com/user-attachments/assets/676d96dd-3a37-4112-a372-eb1beb5efa3f" />
 
 
+```
+src/wall_navigation/point_lio/PCD/scans.pcd
+```
 
+
+**改速度**
+```
+desired_linear_vel: 0.3        # 直线最大速度 m/s
+rotate_to_heading_angular_vel: 0.5  # 原地旋转角速度 rad/s
+max_angular_accel: 1.0         # 最大角加速度
+
+```
+
+**改膨胀层**
+```
+inflation_radius: 0.22         # 膨胀半径（米）
+cost_scaling_factor: 4.0       # 代价衰减速度
+
+```
+机器人半径 0.19m，现在 0.22 = 机器人半径 0.19 + 3cm
+cost_scaling_factor 改大改小的效果：
+改大（如 6.0）：膨胀区代价下降更快，路径更愿意靠近障碍
+改小（如 2.0）：膨胀区代价下降更慢，路径更倾向远离障碍
+
+
+
+<img width="2265" height="1170" alt="124b9c940c29261bf83601fb1d235f7f" src="https://github.com/user-attachments/assets/8ec78523-85c8-484a-af61-c32309cc54a0" />
+
+**到目标点**
+```
+xy_goal_tolerance: 0.10        # 距目标点 10cm 以内算到达
+yaw_goal_tolerance: 6.28      # 6.28 = 2π，不管朝向（到了就算）
+```
 
 
 ### W-4. `fake_vel_transform` 节点说明
