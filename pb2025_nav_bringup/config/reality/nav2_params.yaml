@@ -51,7 +51,7 @@ point_lio:
       lidar_time_inte: 0.1
       satu_acc: 4.0                                     # the saturation value of IMU's acceleration. not related to the units
       satu_gyro: 35.0                                   # the saturation value of IMU's angular velocity. not related to the units
-      acc_norm: 9.81                                     # 1.0 for g as unit, 9.81 for m/s^2 as unit of the IMU's acceleration
+      acc_norm: 1.0                                     # 1.0 for g as unit, 9.81 for m/s^2 as unit of the IMU's acceleration
       lidar_meas_cov: 0.01                              # 0.001
       acc_cov_output: 500.0
       gyr_cov_output: 1000.0
@@ -64,8 +64,8 @@ point_lio:
       plane_thr: 0.1                                    # 0.05, the threshold for plane criteria, the smaller, the flatter a plane
       match_s: 81.0
       ivox_grid_resolution: 0.5
-      gravity: [-0.16, -3.65, -8.98]            # gravity to be aligned
-      gravity_init: [-0.16, -3.65, -8.98]       # preknown gravity in the first IMU body frame, use when imu_en is False or start from a non-stationary state
+      gravity: [-0.02, -0.39, -0.91]            # gravity to be aligned
+      gravity_init: [-0.02, -0.39, -0.91]       # preknown gravity in the first IMU body frame, use when imu_en is False or start from a non-stationary state
       extrinsic_T: [ -0.011, -0.02329, 0.04412 ]
       extrinsic_R: [ 1.0, 0.0, 0.0,
                      0.0, 1.0, 0.0,
@@ -90,7 +90,7 @@ loam_interface:
     use_sim_time: False
     state_estimation_topic: "aft_mapped_to_init"
     registered_scan_topic: "cloud_registered"
-    odom_frame: "odom"
+    odom_frame: "odom" 
     base_frame: "base_footprint"
     lidar_frame: "front_mid360"
 
@@ -98,7 +98,7 @@ sensor_scan_generation:
   ros__parameters:
     use_sim_time: False
     lidar_frame: "front_mid360"
-    base_frame: "base_footprint"
+    base_frame: "gimbal_yaw"
     robot_base_frame: "base_footprint"
 
 terrain_analysis:
@@ -236,8 +236,8 @@ slam_toolbox:
     # General Parameters
     use_scan_matching: false
     use_scan_barycenter: true
-    minimum_travel_distance: 0.1
-    minimum_travel_heading: 0.1
+    minimum_travel_distance: 0.0
+    minimum_travel_heading: 0.0
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
     link_match_minimum_response_fine: 0.1
@@ -274,8 +274,8 @@ bt_navigator:
   ros__parameters:
     use_sim_time: False
     global_frame: map
-    robot_base_frame: base_footprint_fake
-    odom_topic: odometry
+    robot_base_frame: base_footprint
+    odom_topic: lidar_odometry
     bt_loop_duration: 10
     default_server_timeout: 100
     wait_for_service_timeout: 1000
@@ -333,7 +333,7 @@ bt_navigator:
 controller_server:
   ros__parameters:
     use_sim_time: False
-    odom_topic: odometry
+    odom_topic: lidar_odometry
     controller_frequency: 20.0
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.5      # 保持0.5，差速底盘y速度=0 < 0.5，Nav2识别为差速
@@ -383,7 +383,7 @@ local_costmap:
       update_frequency: 10.0
       publish_frequency: 5.0
       global_frame: odom
-      robot_base_frame: base_footprint_fake
+      robot_base_frame: base_footprint
       rolling_window: true
       width: 5
       height: 5
@@ -423,7 +423,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0
-        inflation_radius: 0.34
+        inflation_radius: 0.22
       always_send_full_costmap: False
 
 global_costmap:
@@ -433,7 +433,7 @@ global_costmap:
       update_frequency: 5.0
       publish_frequency: 2.0
       global_frame: map
-      robot_base_frame: base_footprint_fake
+      robot_base_frame: base_footprint
       robot_radius: 0.19
       resolution: 0.05
       track_unknown_space: true
@@ -471,7 +471,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0
-        inflation_radius: 0.34
+        inflation_radius: 0.22
       always_send_full_costmap: False
 
 # The yaml_filename does not need to be specified since it going to be set by defaults in launch.
@@ -532,7 +532,7 @@ behavior_server:
       plugin: "nav2_behaviors/AssistedTeleop"
     local_frame: odom
     global_frame: map
-    robot_base_frame: base_footprint_fake
+    robot_base_frame: base_footprint
     transform_tolerance: 0.1
     simulate_ahead_time: 2.0
     max_rotational_vel: 1.0
@@ -564,7 +564,7 @@ velocity_smoother:
     min_velocity: [-2.5, -2.5, -3.0]
     max_accel: [4.5, 4.5, 5.0]
     max_decel: [-4.5, -4.5, -5.0]
-    odom_topic: "odometry"
+    odom_topic: "lidar_odometry"
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]
     velocity_timeout: 1.0

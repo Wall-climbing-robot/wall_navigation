@@ -49,7 +49,7 @@
             name="livox"
             prefix="front_"
             parent="chassis"
-            pose="0.10 -0.045 0.20 0.0 -0.332 0.0"
+            pose="0.10 -0.045 0.20 0.0 -0.405 0.0"
             update_rate="10"
             samples="1875"/>
 
