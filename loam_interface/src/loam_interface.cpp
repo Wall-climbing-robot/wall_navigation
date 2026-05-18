@@ -39,6 +39,7 @@ LoamInterfaceNode::LoamInterfaceNode(const rclcpp::NodeOptions & options)
 
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
+  tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
   pcd_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("registered_scan", 5);
   odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("lidar_odometry", 5);
@@ -53,6 +54,9 @@ LoamInterfaceNode::LoamInterfaceNode(const rclcpp::NodeOptions & options)
 
 void LoamInterfaceNode::pointCloudCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg)
 {
+  if (!base_frame_to_lidar_initialized_) {
+    return;
+  }
   // NOTE: Input point cloud message is based on the `lidar_odom`
   // Here we transform it to the REAL `odom` frame
   auto out = std::make_shared<sensor_msgs::msg::PointCloud2>();
@@ -83,16 +87,30 @@ void LoamInterfaceNode::odometryCallback(const nav_msgs::msg::Odometry::ConstSha
   tf2::fromMsg(msg->pose.pose, tf_lidar_odom_to_lidar);
   tf2::Transform tf_odom_to_lidar = tf_odom_to_lidar_odom_ * tf_lidar_odom_to_lidar;
 
+  // odom -> base_footprint = odom -> lidar * (base_footprint -> lidar)^-1
+  tf2::Transform tf_odom_to_base = tf_odom_to_lidar * tf_odom_to_lidar_odom_.inverse();
+
+  // Broadcast odom -> base_footprint TF
+  geometry_msgs::msg::TransformStamped tf_msg;
+  tf_msg.header.stamp = msg->header.stamp;
+  tf_msg.header.frame_id = odom_frame_;
+  tf_msg.child_frame_id = base_frame_;
+  tf_msg.transform.translation.x = tf_odom_to_base.getOrigin().x();
+  tf_msg.transform.translation.y = tf_odom_to_base.getOrigin().y();
+  tf_msg.transform.translation.z = tf_odom_to_base.getOrigin().z();
+  tf_msg.transform.rotation = tf2::toMsg(tf_odom_to_base.getRotation());
+  tf_broadcaster_->sendTransform(tf_msg);
+
   nav_msgs::msg::Odometry out;
   out.header.stamp = msg->header.stamp;
   out.header.frame_id = odom_frame_;
-  out.child_frame_id = lidar_frame_;
+  out.child_frame_id = base_frame_;
 
-  const auto & origin = tf_odom_to_lidar.getOrigin();
+  const auto & origin = tf_odom_to_base.getOrigin();
   out.pose.pose.position.x = origin.x();
   out.pose.pose.position.y = origin.y();
   out.pose.pose.position.z = origin.z();
-  out.pose.pose.orientation = tf2::toMsg(tf_odom_to_lidar.getRotation());
+  out.pose.pose.orientation = tf2::toMsg(tf_odom_to_base.getRotation());
 
   odom_pub_->publish(out);
 }

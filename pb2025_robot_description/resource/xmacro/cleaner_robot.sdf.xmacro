@@ -22,10 +22,10 @@
         </joint>
 
         <!--
-            gimbal_yaw：虚拟帧，位置与 chassis 完全重合（零偏移）
-            为什么要保留：fake_vel_transform 节点以 gimbal_yaw 为父帧，
-            动态发布 gimbal_yaw → gimbal_yaw_fake 的 TF（带旋转）。
-            不要在这里定义 gimbal_yaw_fake，否则会和 fake_vel_transform 冲突！
+            gimbal_yaw：虚拟帧，位置与 chassis 完全重合（零偏移）。
+            TF 由 robot_state_publisher 通过 chassis→gimbal_yaw 发布（静态）。
+            sensor_scan_generation 不再单独发布 odom→gimbal_yaw，
+            避免与 loam_interface+robot_state_publisher 的 TF 链产生环路冲突。
         -->
         <link name="gimbal_yaw"/>
         <joint name="gimbal_yaw_joint" type="fixed">
@@ -37,19 +37,24 @@
         <!--
             mid360 雷达安装位置，6 个数字含义：
             前后(m)  左右(m)  高度(m)  roll  pitch  yaw
-            pitch 向前低头为负，例如 30°= -0.524，45°= -0.785
+
+            当前安装说明（雷达 X 轴指向机器人左侧）：
+              yaw = +π/2 (1.5708)：从上方俯视逆时针旋转 90°，使雷达 X 轴指向机器人左侧
+              pitch > 0：雷达向前（即 X 轴方向）低头倾斜，例如 0.349 ≈ 20°
+              roll = 0：无侧倾
 
             用卷尺量好后替换下面的数字：
               第1个数：雷达中心距底盘前后中心的距离（向前为正）
-              第2个数：雷达中心距底盘左右中心的距离（向左为正，居中填0）
+              第2个数：雷达中心距底盘左右中心的距离（向左为正，居中填0，向右为负）
               第3个数：雷达中心距底盘底面的高度
-              第5个数：pitch 角，斜装向前低头填负数
+              第5个数：pitch 角，向前低头（X 轴向下倾）填正数
+              第6个数：yaw 角，1.5708 = 90° 逆时针
         -->
         <xmacro_block
             name="livox"
             prefix="front_"
             parent="chassis"
-            pose="0.10 -0.045 0.20 0.0 -0.332 0.0"
+            pose="0.10 0.00 0.20 0.0 0.349 0.0"
             update_rate="10"
             samples="1875"/>
 
