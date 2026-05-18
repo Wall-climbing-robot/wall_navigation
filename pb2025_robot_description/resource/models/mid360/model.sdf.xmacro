@@ -8,7 +8,7 @@
       <child>${prefix}mid360</child>
     </joint>
     <link name="${prefix}mid360">
-      <pose relative_to="${prefix}livox_joint">0.0 0.0 0.0 0 0 0</pose>
+      <pose relative_to="${prefix}livox_joint">0.0 0.0 0.0 0 0 ${pi/2}</pose>
       <inertial>
         <pose>0 0 0.02 0 0 0</pose>
         <xmacro_block name="inertia_cylinder" m="0.005" r="0.04" l="0.04" />

@@ -64,20 +64,18 @@ void SensorScanGenerationNode::laserCloudAndOdometryHandler(
   const nav_msgs::msg::Odometry::ConstSharedPtr & odometry_msg,
   const sensor_msgs::msg::PointCloud2::ConstSharedPtr & pcd_msg)
 {
-  tf2::Transform tf_lidar_to_chassis;
-  tf2::Transform tf_odom_to_chassis;
   tf2::Transform tf_odom_to_robot_base;
   tf2::Transform tf_odom_to_lidar;
 
   tf2::fromMsg(odometry_msg->pose.pose, tf_odom_to_lidar);
-  tf_lidar_to_robot_base_ = getTransform(lidar_frame_, robot_base_frame_, pcd_msg->header.stamp);
-  tf_lidar_to_chassis = getTransform(lidar_frame_, base_frame_, pcd_msg->header.stamp);
+  // 静态安装变换用 time=0 查询，避免雷达时钟比系统时钟超前导致外推失败
+  tf_lidar_to_robot_base_ = getTransform(lidar_frame_, robot_base_frame_, rclcpp::Time(0));
 
-  tf_odom_to_chassis = tf_odom_to_lidar * tf_lidar_to_chassis;
   tf_odom_to_robot_base = tf_odom_to_lidar * tf_lidar_to_robot_base_;
 
-  publishTransform(
-    tf_odom_to_chassis, odometry_msg->header.frame_id, base_frame_, pcd_msg->header.stamp);
+  // 不发布 odom→base_frame TF：loam_interface 已经发布 odom→base_footprint，
+  // robot_state_publisher 发布完整的 base_footprint→chassis→gimbal_yaw 静态链。
+  // 若此处再发布 odom→gimbal_yaw，会产生 TF 环路，导致 gimbal_yaw 乱甩。
   publishOdometry(
     tf_odom_to_robot_base, odometry_msg->header.frame_id, robot_base_frame_, pcd_msg->header.stamp);
 
