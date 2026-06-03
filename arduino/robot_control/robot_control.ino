@@ -48,6 +48,8 @@ bool rcConnected = false;
 
 // ────────────────────────────
 void setup() {
+  pinMode(13, OUTPUT);   // 板载 LED，用于确认固件运行
+
   // 串口一：接上位机
   Serial.begin(JETSON_BAUD);
 
@@ -90,6 +92,13 @@ void loop() {
 
   leftESC.writeMicroseconds(map(L, -MAX_SPEED_MMS, MAX_SPEED_MMS, 1000, 2000));
   rightESC.writeMicroseconds(map(R, -MAX_SPEED_MMS, MAX_SPEED_MMS, 1000, 2000));
+
+  // LED 每500ms翻转一次，用于确认固件正在运行
+  static unsigned long lastBlink = 0;
+  if (millis() - lastBlink >= 500) {
+    lastBlink = millis();
+    digitalWrite(13, !digitalRead(13));
+  }
 
   delay(20);
 }

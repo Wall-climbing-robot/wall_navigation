@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/home/winlong/.platformio/penv/bin/platformio run *)"
+    ]
+  }
+}

@@ -86,6 +86,8 @@ void OmniPidPursuitController::configure(
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".use_rotate_to_heading_treshold", rclcpp::ParameterValue(0.1));
   declare_parameter_if_not_declared(
+    node, plugin_name_ + ".holonomic", rclcpp::ParameterValue(true));
+  declare_parameter_if_not_declared(
     node, plugin_name_ + ".min_approach_linear_velocity", rclcpp::ParameterValue(0.05));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".approach_velocity_scaling_dist", rclcpp::ParameterValue(0.6));
@@ -132,6 +134,8 @@ void OmniPidPursuitController::configure(
   node->get_parameter(plugin_name_ + ".use_rotate_to_heading", use_rotate_to_heading_);
   node->get_parameter(
     plugin_name_ + ".use_rotate_to_heading_treshold", use_rotate_to_heading_treshold_);
+  node->get_parameter(plugin_name_ + ".holonomic", holonomic_);
+  // ...
   node->get_parameter(
     plugin_name_ + ".min_approach_linear_velocity", min_approach_linear_velocity_);
   node->get_parameter(
@@ -239,9 +243,21 @@ geometry_msgs::msg::TwistStamped OmniPidPursuitController::computeVelocityComman
   double angle_to_goal = tf2::getYaw(carrot_pose.pose.orientation);
 
   if (use_rotate_to_heading_) {
-    angle_to_goal = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
-    if (fabs(angle_to_goal) > use_rotate_to_heading_treshold_) {
-      lin_dist = 0;
+    if (holonomic_) {
+      // 全向模式：对齐到最终目标的姿态
+      angle_to_goal = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
+      if (fabs(angle_to_goal) > use_rotate_to_heading_treshold_) {
+        lin_dist = 0;
+      }
+    } else {
+      // 差速模式：对齐到前方路径点 (Carrot Point) 的方向
+      if (fabs(theta_dist) > use_rotate_to_heading_treshold_) {
+        lin_dist = 0.0; // 角度偏差过大，强制线速度为0，先原地旋转
+        angle_to_goal = theta_dist; // 强制角速度PID追踪路径点方向
+      } else {
+        // 角度对齐时，角速度依旧追踪路径点方向以保持轨迹
+        angle_to_goal = theta_dist;
+      }
     }
   }
 
@@ -267,8 +283,15 @@ geometry_msgs::msg::TwistStamped OmniPidPursuitController::computeVelocityComman
   geometry_msgs::msg::TwistStamped cmd_vel;
   cmd_vel.header = pose.header;
   if (!isCollisionDetected(costmap_frame_local_plan)) {
-    cmd_vel.twist.linear.x = lin_vel * cos(theta_dist);
-    cmd_vel.twist.linear.y = lin_vel * sin(theta_dist);
+    if (holonomic_) {
+      // 全向模式：将线速度分解到 X 和 Y 轴
+      cmd_vel.twist.linear.x = lin_vel * cos(theta_dist);
+      cmd_vel.twist.linear.y = lin_vel * sin(theta_dist);
+    } else {
+      // 差速模式：只在 X 轴输出速度，Y 轴置零
+      cmd_vel.twist.linear.x = lin_vel;
+      cmd_vel.twist.linear.y = 0.0;
+    }
     cmd_vel.twist.angular.z = angular_vel;
   } else {
     throw nav2_core::PlannerException("Collision detected in the trajectory. Stopping the robot!");
@@ -751,6 +774,8 @@ rcl_interfaces::msg::SetParametersResult OmniPidPursuitController::dynamicParame
         use_interpolation_ = parameter.as_bool();
       } else if (name == plugin_name_ + ".use_rotate_to_heading") {
         use_rotate_to_heading_ = parameter.as_bool();
+      } else if (name == plugin_name_ + ".holonomic") {
+        holonomic_ = parameter.as_bool();
       }
     }
   }

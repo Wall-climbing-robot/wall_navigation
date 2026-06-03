@@ -358,28 +358,37 @@ controller_server:
       xy_goal_tolerance: 0.10           # 原0.15 → 0.10，精度提高
       yaw_goal_tolerance: 6.28
     FollowPath:
-      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      plugin: "pb_omni_pid_pursuit_controller::OmniPidPursuitController"
       desired_linear_vel: 0.3           # 地面最大速度 m/s（上墙改0.15）
       lookahead_dist: 0.4
       min_lookahead_dist: 0.3
       max_lookahead_dist: 0.9
       lookahead_time: 1.5
-      rotate_to_heading_angular_vel: 1.0
       use_velocity_scaled_lookahead_dist: false
       min_approach_linear_velocity: 0.05
       approach_velocity_scaling_dist: 0.6
       use_collision_detection: false
       max_allowed_time_to_collision_up_to_goal: 1.0
-      use_regulated_linear_velocity_scaling: true
-      use_fixed_curvature_lookahead: false
-      curvature_feedback_gain: 3.5
-      inflation_cost_scaling_factor: 3.0
-      regulated_linear_scaling_min_radius: 0.9
-      regulated_linear_scaling_min_speed: 0.25
-      use_rotate_to_heading: false
-      allow_reversing: false
-      rotate_to_heading_min_angle: 0.785
-      max_angular_accel: 1.0
+      use_rotate_to_heading: true
+      use_rotate_to_heading_treshold: 0.1    # 偏差超过0.1弧度(~6°)就原地旋转
+      holonomic: false                        # 差速模式！
+      enable_rotation: true
+      translation_kp: 3.0
+      translation_ki: 0.1
+      translation_kd: 0.3
+      rotation_kp: 3.0
+      rotation_ki: 0.1
+      rotation_kd: 0.3
+      v_linear_max: 0.5
+      v_linear_min: -0.5
+      v_angular_max: 1.0
+      v_angular_min: -1.0
+      curvature_min: 0.4
+      curvature_max: 0.7
+      reduction_ratio_at_high_curvature: 0.5
+      curvature_forward_dist: 0.7
+      curvature_backward_dist: 0.3
+      max_velocity_scaling_factor_rate: 0.9
       max_robot_pose_search_dist: 10.0
 
 local_costmap:
