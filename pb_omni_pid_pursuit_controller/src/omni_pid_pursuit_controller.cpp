@@ -86,6 +86,8 @@ void OmniPidPursuitController::configure(
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".use_rotate_to_heading_treshold", rclcpp::ParameterValue(0.1));
   declare_parameter_if_not_declared(
+    node, plugin_name_ + ".holonomic", rclcpp::ParameterValue(true));
+  declare_parameter_if_not_declared(
     node, plugin_name_ + ".min_approach_linear_velocity", rclcpp::ParameterValue(0.05));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".approach_velocity_scaling_dist", rclcpp::ParameterValue(0.6));
@@ -132,6 +134,8 @@ void OmniPidPursuitController::configure(
   node->get_parameter(plugin_name_ + ".use_rotate_to_heading", use_rotate_to_heading_);
   node->get_parameter(
     plugin_name_ + ".use_rotate_to_heading_treshold", use_rotate_to_heading_treshold_);
+  node->get_parameter(plugin_name_ + ".holonomic", holonomic_);
+  // ...
   node->get_parameter(
     plugin_name_ + ".min_approach_linear_velocity", min_approach_linear_velocity_);
   node->get_parameter(
@@ -239,9 +243,21 @@ geometry_msgs::msg::TwistStamped OmniPidPursuitController::computeVelocityComman
   double angle_to_goal = tf2::getYaw(carrot_pose.pose.orientation);
 
   if (use_rotate_to_heading_) {
-    angle_to_goal = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
-    if (fabs(angle_to_goal) > use_rotate_to_heading_treshold_) {
-      lin_dist = 0;
+    if (holonomic_) {
+      // 全向模式：对齐到最终目标的姿态
+      angle_to_goal = tf2::getYaw(transformed_plan.poses.back().pose.orientation);
+      if (fabs(angle_to_goal) > use_rotate_to_heading_treshold_) {
+        lin_dist = 0;
+      }
+    } else {
+      // 差速模式：先原地旋转对齐到 carrot 方向，再前行
+      // 避障仍然有效：carrot 在 planner 规划的无碰路径上，
+      // 且 isCollisionDetected() 会检查路径前方是否有障碍物
+      double abs_theta = fabs(theta_dist);
+      if (abs_theta > use_rotate_to_heading_treshold_) {
+        lin_dist = 0.0;   // 角度偏差大 → 停车原地旋转
+      }
+      angle_to_goal = -theta_dist;
     }
   }
 
@@ -255,7 +271,7 @@ geometry_msgs::msg::TwistStamped OmniPidPursuitController::computeVelocityComman
   // Transform local frame to global frame to use in collision checking
   nav_msgs::msg::Path costmap_frame_local_plan;
 
-  int sample_points = 10;
+  int sample_points = 20;  // 提高采样密度，避免跳过窄障碍物
   int plan_size = transformed_plan.poses.size();
   for (int i = 0; i < sample_points; ++i) {
     int index = std::min((i * plan_size) / sample_points, plan_size - 1);
@@ -267,8 +283,15 @@ geometry_msgs::msg::TwistStamped OmniPidPursuitController::computeVelocityComman
   geometry_msgs::msg::TwistStamped cmd_vel;
   cmd_vel.header = pose.header;
   if (!isCollisionDetected(costmap_frame_local_plan)) {
-    cmd_vel.twist.linear.x = lin_vel * cos(theta_dist);
-    cmd_vel.twist.linear.y = lin_vel * sin(theta_dist);
+    if (holonomic_) {
+      // 全向模式：将线速度分解到 X 和 Y 轴
+      cmd_vel.twist.linear.x = lin_vel * cos(theta_dist);
+      cmd_vel.twist.linear.y = lin_vel * sin(theta_dist);
+    } else {
+      // 差速模式：只在 X 轴输出速度，Y 轴置零
+      cmd_vel.twist.linear.x = lin_vel;
+      cmd_vel.twist.linear.y = 0.0;
+    }
     cmd_vel.twist.angular.z = angular_vel;
   } else {
     throw nav2_core::PlannerException("Collision detected in the trajectory. Stopping the robot!");
@@ -277,7 +300,13 @@ geometry_msgs::msg::TwistStamped OmniPidPursuitController::computeVelocityComman
   return cmd_vel;
 }
 
-void OmniPidPursuitController::setPlan(const nav_msgs::msg::Path & path) { global_plan_ = path; }
+void OmniPidPursuitController::setPlan(const nav_msgs::msg::Path & path)
+{
+  global_plan_ = path;
+  // 新路径 → 重置 PID 积分和上一次误差，防止旧累积量污染新导航
+  move_pid_->reset();
+  heading_pid_->reset();
+}
 
 void OmniPidPursuitController::setSpeedLimit(
   const double & /*speed_limit*/, const bool & /*percentage*/)
@@ -451,19 +480,32 @@ bool OmniPidPursuitController::transformPose(
 bool OmniPidPursuitController::isCollisionDetected(const nav_msgs::msg::Path & path)
 {
   auto costmap = costmap_ros_->getCostmap();
+  double resolution = costmap->getResolution();
+  double inscribed_radius = costmap_ros_->getLayeredCostmap()->getInscribedRadius();
+
+  // 用机器人内切圆半径（单元格数）做圆盘碰撞检测，覆盖实车宽度
+  int radius_cells = static_cast<int>(std::ceil(inscribed_radius / resolution));
+
   for (const auto & pose_stamped : path.poses) {
     const auto & pose = pose_stamped.pose;
     unsigned int mx, my;
-    if (costmap->worldToMap(pose.position.x, pose.position.y, mx, my)) {
-      if (costmap->getCost(mx, my) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
-        return true;
+    if (!costmap->worldToMap(pose.position.x, pose.position.y, mx, my)) {
+      continue;  // 采样点超出代价地图边界 → 跳过（不是安全区域，但不直接报碰撞）
+    }
+
+    // 以采样点为中心，检查 inscribed_radius 范围内的圆盘区域
+    for (int dx = -radius_cells; dx <= radius_cells; ++dx) {
+      for (int dy = -radius_cells; dy <= radius_cells; ++dy) {
+        if (dx * dx + dy * dy > radius_cells * radius_cells) continue;  // 圆形
+        unsigned int cx = mx + dx;
+        unsigned int cy = my + dy;
+        unsigned int size_x = costmap->getSizeInCellsX();
+        unsigned int size_y = costmap->getSizeInCellsY();
+        if (cx >= size_x || cy >= size_y) continue;  // 超出 costmap 范围
+        if (costmap->getCost(cx, cy) >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
+          return true;
+        }
       }
-    } else {
-      // RCLCPP_WARN(
-      //   logger_,
-      //   "The Local path is not in the costmap. Cannot check for collisions. "
-      //   "Proceed at your own risk, slow the robot, or increase your costmap size.");
-      return false;
     }
   }
   return false;
@@ -751,6 +793,8 @@ rcl_interfaces::msg::SetParametersResult OmniPidPursuitController::dynamicParame
         use_interpolation_ = parameter.as_bool();
       } else if (name == plugin_name_ + ".use_rotate_to_heading") {
         use_rotate_to_heading_ = parameter.as_bool();
+      } else if (name == plugin_name_ + ".holonomic") {
+        holonomic_ = parameter.as_bool();
       }
     }
   }

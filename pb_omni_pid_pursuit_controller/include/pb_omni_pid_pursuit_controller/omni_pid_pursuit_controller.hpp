@@ -285,6 +285,7 @@ private:
   double lookahead_time_;
   bool use_rotate_to_heading_;
   double use_rotate_to_heading_treshold_;
+  bool holonomic_;
   double v_linear_min_;
   double v_linear_max_;
   double v_angular_min_;

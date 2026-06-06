@@ -91,7 +91,8 @@ if(ROS_EDITION STREQUAL "ROS1")
   set(CMAKE_CXX_EXTENSIONS OFF)
 
   ## make sure the livox_lidar_sdk_static library is installed
-  find_library(LIVOX_LIDAR_SDK_LIBRARY  liblivox_lidar_sdk_static.a    /usr/local/lib)
+  get_filename_component(COLCON_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX} DIRECTORY)
+  find_library(LIVOX_LIDAR_SDK_LIBRARY  liblivox_lidar_sdk_static.a    /usr/local/lib ${COLCON_INSTALL_PREFIX}/livox_sdk2/lib)
 
   ## PCL library
   link_directories(${PCL_LIBRARY_DIRS})
@@ -252,11 +253,15 @@ else(ROS_EDITION STREQUAL "ROS2")
   )
 
   ## make sure the livox_lidar_sdk_shared library is installed
-  find_library(LIVOX_LIDAR_SDK_LIBRARY liblivox_lidar_sdk_shared.so /usr/local/lib REQUIRED)
+  get_filename_component(COLCON_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX} DIRECTORY)
+  find_library(LIVOX_LIDAR_SDK_LIBRARY liblivox_lidar_sdk_shared.so
+    PATHS /usr/local/lib ${COLCON_INSTALL_PREFIX}/livox_sdk2/lib
+    REQUIRED)
 
   ##
   find_path(LIVOX_LIDAR_SDK_INCLUDE_DIR
     NAMES "livox_lidar_api.h" "livox_lidar_def.h"
+    PATHS ${COLCON_INSTALL_PREFIX}/livox_sdk2/include
     REQUIRED)
 
   ## PCL library

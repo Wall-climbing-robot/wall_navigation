@@ -58,4 +58,10 @@ double PID::calculate(double set_point, double pv)
 
 void PID::setSumError(double sum_error) { integral_ = sum_error; }
 
+void PID::reset()
+{
+  integral_ = 0.0;
+  pre_error_ = 0.0;
+}
+
 PID::~PID() {}

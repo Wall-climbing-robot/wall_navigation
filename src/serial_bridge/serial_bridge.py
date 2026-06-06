@@ -20,6 +20,8 @@ serial_bridge — Nav2 cmd_vel → 串口 → Arduino
 import glob
 import subprocess
 
+import time
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
@@ -115,7 +117,7 @@ class SerialBridge(Node):
         if 0 < abs(right_mms) < DEAD_ZONE:
             right_mms = 0
 
-        line = f"L{right_mms} R{left_mms}\n"
+        line = f"L{left_mms} R{right_mms}\n"
 
         print(f"[serial_bridge] RX cmd_vel  vx={vx:+.3f} wz={wz:+.3f}  "
               f"→ L={left_mms:+5d} R={right_mms:+5d} mm/s", flush=True)
@@ -127,6 +129,19 @@ class SerialBridge(Node):
         try:
             self.ser.write(line.encode())
             print(f"[serial_bridge] TX: {line.strip()}", flush=True)
+            # 发送后立刻读 Arduino 回传的 echo（最多等 200ms）
+            echo = b""
+            t0 = time.monotonic()
+            while time.monotonic() - t0 < 0.2:
+                if self.ser.in_waiting:
+                    c = self.ser.read(1)
+                    echo += c
+                    if c == b"\n":
+                        break
+                else:
+                    time.sleep(0.005)
+            if echo:
+                print(f"[serial_bridge] RX ← {echo.decode(errors='replace').strip()}", flush=True)
         except Exception as e:
             print(f"[serial_bridge] 串口写入失败({type(e).__name__}): {e}", flush=True)
             try:

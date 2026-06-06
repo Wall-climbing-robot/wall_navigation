@@ -29,6 +29,7 @@ public:
   // Returns the manipulated variable given a set_point and current process value
   double calculate(double set_point, double pv);
   void setSumError(double sum_error);
+  void reset();
   ~PID();
 
 private:
